@@ -1,0 +1,89 @@
+---
+- name: Copy scripts
+  hosts: all
+  gather_facts: false
+  vars:
+    script_name: scripts/ # Replace with your actual script path
+  tasks:
+    - name: Copy script to remote hosts
+      copy: 
+        src: "{{ script_name }}"
+        dest: "/tmp/"
+        mode: 0777
+
+
+- name: output hostname
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Execute script on remote hosts
+      shell: "echo {{ host_name }} > /tmp/hostname"
+      args:
+        executable: /bin/bash
+
+- name: Generate hosts
+  hosts: all
+  gather_facts: false
+  vars:
+    script_name: script_0-hosts.sh # Replace with your actual script path
+  tasks:
+    - name: Execute script on remote hosts
+      command: "/tmp/{{ script_name | basename }}"
+
+
+- name: Install containerd
+  hosts: all
+  gather_facts: false
+  vars:
+    script_name: script_0-containerd.sh # Replace with your actual script path
+  tasks:
+    - name: Execute script on remote hosts
+      command: "/tmp/{{ script_name | basename }}"
+
+- name: Install kubeadm
+  hosts: all
+  gather_facts: false
+  vars:
+    script_name: script_1-kubadm.sh # Replace with your actual script path
+  tasks:
+    - name: Execute script on remote hosts
+      command: "/tmp/{{ script_name | basename }}"
+
+- name: Init control plane
+  hosts: control
+  gather_facts: false
+  vars:
+    script_name: script_2-control-init.sh # Replace with your actual script path
+  tasks:
+    - name: Execute script on remote hosts
+      command: "/tmp/{{ script_name | basename }}"
+
+- name: Bashrc
+  hosts: all
+  gather_facts: false
+  vars:
+    script_name: script_3-bashrc.sh # Replace with your actual script path
+  tasks:
+    - name: Execute script on remote hosts
+      command: "/tmp/{{ script_name | basename }}"
+
+- name: Register command output from control host
+  hosts: control
+  tasks:
+  - name: Execute command on control host
+    shell: kubeadm token create --print-join-command  # replace with your command
+    register: command_output
+
+  - name: Set fact with command output
+    set_fact:
+      command_output_fact: "{{ command_output.stdout }}"
+  
+  - name: Get control host IP
+    set_fact:
+      control_host_ip: "{{ ansible_host }}"
+
+- name: Execute command on worker host
+  hosts: worker
+  tasks:
+  - name: Execute command on worker host using registered output
+    shell: eval "sudo {{ hostvars[groups['control'][0]]['command_output_fact'] }}"
